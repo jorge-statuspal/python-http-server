@@ -1,8 +1,10 @@
 # Artisanal Python HTTP Server
 
-## Prerequisites
+## Installation
 
-PyYAML
+```
+pip install -r requirements.txt
+```
 
 ## Run the server
 
