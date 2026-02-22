@@ -3,6 +3,11 @@ import queue
 import threading
 from typing import Type
 
+try:
+    from http_parser.parser import HttpParser
+except ImportError:
+    from http_parser.pyparser import HttpParser
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,7 +16,6 @@ Date: Mon, 27 Jul 2009 12:28:53 GMT
 Server: Apache/2.2.14 (Win32)
 Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
 Content-Type: text/html; charset=UTF-8
-Content-Length: 125
 Connection: close
 
 <!DOCTYPE html>
@@ -68,7 +72,40 @@ class RequestProcessorThread(threading.Thread):
                 continue
     
     def process(self, sock):
-        logger.info("Hello")
-        chunk = sock.recv(1000)
+        p = HttpParser()
+        body = []
+        raw_chunks = []
+        while True:
+            data = sock.recv(1024)
+            if not data:
+                return
+
+            raw_chunks.append(data)
+            p.execute(data, len(data))
+
+            if p.is_partial_body():
+                body.append(p.recv_body())
+
+            if p.is_message_complete():
+                break
+
+        body = "".join(body)
+        raw_request = b"".join(raw_chunks)
+        headers = p.get_headers()
+        path = p.get_path()
+        query = p.get_query_string()
+        method = p.get_method()
+
+        logger.info("Request received")
+        logger.info(
+            "Method: %s, Path: %s, Query: %s, Headers: %s, Body: %s",
+            method,
+            path,
+            query,
+            headers,
+            body,
+        )
+        logger.info("Raw request: \n%s", raw_request.decode("utf-8", errors="replace"))
+
         sock.send(str.encode(DUMMY_RESPONSE))
         sock.close()
